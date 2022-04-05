@@ -5,4 +5,4 @@ data from [exchangeratesapi.io](http://exchangeratesapi.io).
 
 ---
 
-Copyright &copy; 2017 Stitch
+Copyright &copy; 2022 Sagedata

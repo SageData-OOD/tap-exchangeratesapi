@@ -11,12 +11,13 @@ import copy
 
 from datetime import date, datetime, timedelta
 
-base_url = 'https://api.exchangeratesapi.io/'
+base_url = 'http://api.exchangeratesapi.io/v1/'
 
 logger = singer.get_logger()
 session = requests.Session()
 
-DATE_FORMAT='%Y-%m-%d'
+DATE_FORMAT = '%Y-%m-%d'
+
 
 def parse_response(r):
     flattened = r['rates']
@@ -24,16 +25,19 @@ def parse_response(r):
     flattened['date'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.strptime(r['date'], DATE_FORMAT))
     return flattened
 
+
 schema = {'type': 'object',
           'properties':
-          {'date': {'type': 'string',
-                    'format': 'date-time'}}}
+              {'date': {'type': 'string',
+                        'format': 'date-time'}}}
+
 
 def giveup(error):
     logger.error(error.response.text)
     response = error.response
     return not (response.status_code == 429 or
                 response.status_code >= 500)
+
 
 @backoff.on_exception(backoff.constant,
                       (requests.exceptions.RequestException),
@@ -45,19 +49,21 @@ def request(url, params):
     response = requests.get(url=url, params=params)
     response.raise_for_status()
     return response
-    
-def do_sync(base, start_date):
+
+
+def do_sync(config, start_date):
+    base = config.get('base', 'USD')
     state = {'start_date': start_date}
     next_date = start_date
     prev_schema = {}
-    
+
     try:
         while datetime.strptime(next_date, DATE_FORMAT) <= datetime.utcnow():
             logger.info('Replicating exchange rate data from %s using base %s',
                         next_date,
                         base)
 
-            response = request(base_url + next_date, {'base': base})
+            response = request(base_url + next_date, {'base': base, 'access_key': config['access_key']})
             payload = response.json()
 
             # Update schema if new currency/currencies exist
@@ -112,7 +118,7 @@ def main():
     start_date = state.get('start_date') or config.get('start_date') or datetime.utcnow().strftime(DATE_FORMAT)
     start_date = singer.utils.strptime_with_tz(start_date).date().strftime(DATE_FORMAT)
 
-    do_sync(config.get('base', 'USD'), start_date)
+    do_sync(config, start_date)
 
 
 if __name__ == '__main__':

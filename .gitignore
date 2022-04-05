@@ -90,5 +90,5 @@ ENV/
 
 # Custom stuff
 env.sh
-
+.idea
 *~
