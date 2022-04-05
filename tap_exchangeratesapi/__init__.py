@@ -104,7 +104,7 @@ def main():
     parser.add_argument(
         '-d', '--discover', action="store_true")
 
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
     
     if args.discover:
         print("{}")
