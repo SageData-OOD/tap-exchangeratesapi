@@ -19,11 +19,17 @@ session = requests.Session()
 DATE_FORMAT = '%Y-%m-%d'
 
 
-def parse_response(r):
-    flattened = r['rates']
-    flattened[r['base']] = 1.0
-    flattened['date'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.strptime(r['date'], DATE_FORMAT))
-    return flattened
+def parse_response(r, base):
+    rates = r['rates']
+
+    # Only EUR is supported as base currency hence conversion is needed
+    base_currency_eur_multiplier = 1 / rates[base]
+    for k, v in rates.items():
+        rates[k] = v * base_currency_eur_multiplier    
+
+    rates[base] = 1.0
+    rates['date'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.strptime(r['date'], DATE_FORMAT))
+    return rates
 
 
 schema = {'type': 'object',
@@ -63,7 +69,7 @@ def do_sync(config, start_date):
                         next_date,
                         base)
 
-            response = request(base_url + next_date, {'base': base, 'access_key': config['access_key']})
+            response = request(base_url + next_date, {'access_key': config['access_key']})
             payload = response.json()
 
             # Update schema if new currency/currencies exist
@@ -76,7 +82,7 @@ def do_sync(config, start_date):
                 singer.write_schema('exchange_rate', schema, 'date')
 
             if payload['date'] == next_date:
-                singer.write_records('exchange_rate', [parse_response(payload)])
+                singer.write_records('exchange_rate', [parse_response(payload, base)])
 
             state = {'start_date': next_date}
             next_date = (datetime.strptime(next_date, DATE_FORMAT) + timedelta(days=1)).strftime(DATE_FORMAT)
