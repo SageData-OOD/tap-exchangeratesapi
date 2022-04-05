@@ -101,7 +101,14 @@ def main():
     parser.add_argument(
         '-s', '--state', help='State file', required=False)
 
+    parser.add_argument(
+        '-d', '--discover', action="store_true")
+
     args = parser.parse_args()
+    
+    if args.discover:
+        print("{}")
+        return
 
     if args.config:
         with open(args.config) as file:
