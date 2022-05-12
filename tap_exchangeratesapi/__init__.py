@@ -1,20 +1,25 @@
 #!/usr/bin/env python3
 
+import argparse
+import copy
 import json
 import sys
-import argparse
 import time
+from datetime import datetime, timedelta
+
+import backoff
 import requests
 import singer
-import backoff
-import copy
+import pandas as pd
+import numpy as np
 
-from datetime import date, datetime, timedelta
-
+LOGGER = singer.get_logger()
 base_url = 'http://api.exchangeratesapi.io/v1/'
+history_url = 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip'
 
 logger = singer.get_logger()
 session = requests.Session()
+utcnow = datetime.utcnow()
 
 DATE_FORMAT = '%Y-%m-%d'
 
@@ -57,12 +62,55 @@ def request(url, params):
     return response
 
 
+def get_historical_records(start_date, end_date, base):
+    df = pd.read_csv(history_url, compression='zip')
+    df = df[df['Date'] >= start_date]
+    df = df[df['Date'] < end_date]
+    df = df.replace({np.nan: None})
+    df = df.drop('Unnamed: 42', axis=1, errors='ignore')
+    df.rename(columns={'Date': 'date'}, inplace=True)
+
+    if base == "EUR":
+        df["EUR"] = 1.0
+
+    records = df.to_dict("records")
+    updated_records = []
+    if base not in df and base != "EUR":
+        LOGGER.info("Selected Base Currency(%s) column not found in historical data", base)
+        LOGGER.info("Skipping historical data sync...")
+        return []
+
+    for rates in records:
+        base_currency_eur_multiplier = ((1 / rates[base]) if rates[base] else rates[base])\
+            if base != "EUR"\
+            else 1
+        if not base_currency_eur_multiplier:
+            LOGGER.info("Skipping Row, Can't do conversion for date '%s', Base currency(%s) has value => NONE", rates["date"], base)
+            continue
+
+        data = {k: (v * base_currency_eur_multiplier) if isinstance(v, (float, int)) else v
+                for k, v in rates.items()}
+        data["date"] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.strptime(data["date"], DATE_FORMAT))
+        updated_records.append(data)
+
+    return df.columns, updated_records
+
+
 def do_sync(config, start_date):
     base = config.get('base', 'USD')
+    historical_end_date = utcnow - timedelta(days=14)
+    if datetime.strptime(start_date, "%Y-%m-%d") < historical_end_date:
+        headers, records = get_historical_records(start_date, historical_end_date.strftime('%Y-%m-%d'), base)
+        for h in headers:
+            if h != "date":
+                schema['properties'][h] = {'type': ['null', 'number']}
+        singer.write_schema('exchange_rate', schema, 'date')
+        singer.write_records('exchange_rate', records)
+        start_date = historical_end_date.strftime('%Y-%m-%d')
+
     state = {'start_date': start_date}
     next_date = start_date
     prev_schema = {}
-
     try:
         while datetime.strptime(next_date, DATE_FORMAT) <= datetime.utcnow():
             logger.info('Replicating exchange rate data from %s using base %s',

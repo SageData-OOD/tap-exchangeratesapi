@@ -11,7 +11,9 @@ setup(name='tap-exchangeratesapi',
       py_modules=['tap_exchangeratesapi'],
       install_requires=['singer-python==5.3.3',
                         'backoff==1.3.2',
-                        'requests==2.21.0'],
+                        'requests==2.21.0',
+                        'pandas==1.3.5'
+                        'numpy==1.21.6'],
       extras_require={
           'dev': [
               'ipdb==0.11'
