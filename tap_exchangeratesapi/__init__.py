@@ -77,9 +77,16 @@ def get_historical_records(start_date, end_date, base):
     df["EUR"] = 1.0
 
     # fix gaps during weekends when no quotes are available in the dataset
+    utc_today = str(datetime.utcnow().date())
+    dfToday = df[df['date'] == utc_today]
+    
+    if dfToday.empty:
+        df = pd.concat([df.head(1), df])
+        df.head(1)['date'] = utc_today
+
     df['date'] = pd.to_datetime(df['date'])
     df.set_index("date", inplace=True)
-    df = df.resample('D').bfill().reset_index()
+    df = df.resample('D').ffill().reset_index()
     df['date'] = df['date'].astype(str)
 
     records = df.to_dict("records")
