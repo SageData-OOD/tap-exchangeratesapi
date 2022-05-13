@@ -103,7 +103,7 @@ def get_historical_records(start_date, end_date, base):
 
 def do_sync(config, start_date):
     base = config.get('base', 'USD')
-    historical_end_date = utcnow - timedelta(days=config["days_back"])
+    historical_end_date = utcnow - timedelta(days=config.get("days_back", 0))
     if datetime.strptime(start_date, "%Y-%m-%d") < historical_end_date:
         logger.info('Replicating Historical exchange rate from date %s to %s using base %s',
                     start_date,
