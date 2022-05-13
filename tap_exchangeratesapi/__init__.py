@@ -67,7 +67,7 @@ def get_historical_records(start_date, end_date, base):
 
     # Extract records for the time period between start date and end date.
     df = df[df['Date'] >= start_date]
-    df = df[df['Date'] <= end_date]
+    df = df[df['Date'] < end_date]
 
     # Refactor -> remove nan, drop extraneous column, Rename Date to date
     df = df.replace({np.nan: None})
