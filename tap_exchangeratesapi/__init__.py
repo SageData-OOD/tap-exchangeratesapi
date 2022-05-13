@@ -19,7 +19,6 @@ history_url = 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip'
 
 logger = singer.get_logger()
 session = requests.Session()
-utcnow = datetime.utcnow()
 
 DATE_FORMAT = '%Y-%m-%d'
 
@@ -103,7 +102,7 @@ def get_historical_records(start_date, end_date, base):
 
 def do_sync(config, start_date):
     base = config.get('base', 'USD')
-    historical_end_date = utcnow - timedelta(days=config.get("days_back", 0))
+    historical_end_date = datetime.utcnow() - timedelta(days=config.get("days_back", 0))
     if datetime.strptime(start_date, "%Y-%m-%d") < historical_end_date:
         logger.info('Replicating Historical exchange rate from date %s to %s using base %s',
                     start_date,
@@ -115,7 +114,7 @@ def do_sync(config, start_date):
                 schema['properties'][h] = {'type': ['null', 'number']}
         singer.write_schema('exchange_rate', schema, 'date')
         singer.write_records('exchange_rate', records)
-        start_date = historical_end_date.strftime('%Y-%m-%d')
+        start_date = historical_end_date.strftime('%Y-%m-%d') + timedelta(days=1)
 
     state = {'start_date': start_date}
     next_date = start_date
