@@ -63,9 +63,14 @@ def request(url, params):
 
 
 def get_historical_records(start_date, end_date, base):
+    # Download records
     df = pd.read_csv(history_url, compression='zip')
+
+    # Extract records for the time period between start date and end date.
     df = df[df['Date'] >= start_date]
     df = df[df['Date'] < end_date]
+
+    # Refactor -> remove nan, drop extraneous column, Rename Date to date
     df = df.replace({np.nan: None})
     df = df.drop('Unnamed: 42', axis=1, errors='ignore')
     df.rename(columns={'Date': 'date'}, inplace=True)
@@ -100,6 +105,10 @@ def do_sync(config, start_date):
     base = config.get('base', 'USD')
     historical_end_date = utcnow - timedelta(days=14)
     if datetime.strptime(start_date, "%Y-%m-%d") < historical_end_date:
+        logger.info('Replicating Historical exchange rate from date %s to %s using base %s',
+                    start_date,
+                    historical_end_date.strftime('%Y-%m-%d'),
+                    base)
         headers, records = get_historical_records(start_date, historical_end_date.strftime('%Y-%m-%d'), base)
         for h in headers:
             if h != "date":
