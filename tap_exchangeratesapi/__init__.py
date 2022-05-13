@@ -78,28 +78,23 @@ def get_historical_records(start_date, end_date, base):
 
     records = df.to_dict("records")
     updated_records = []
-
-    if base not in df:
-        LOGGER.info("Selected Base Currency(%s) column not found in historical data", base)
-        LOGGER.info("Skipping historical data sync...")
-        return []
-
     latest_available_date = None
 
-    for rates in records:
-        base_currency_eur_multiplier = 1 / rates[base]
+    if base in df:
+        for rates in records:
+            base_currency_eur_multiplier = 1 / rates[base]
 
-        if not base_currency_eur_multiplier:
-            LOGGER.info("Skipping Row, Can't do conversion for date '%s', Base currency(%s) has value => NONE", rates["date"], base)
-            continue
+            if not base_currency_eur_multiplier:
+                LOGGER.info("Skipping Row, Can't do conversion for date '%s', Base currency(%s) has value => NONE", rates["date"], base)
+                continue
 
-        data = {k: (v * base_currency_eur_multiplier) if isinstance(v, (float, int)) else v
-                for k, v in rates.items()}
-        data["date"] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.strptime(data["date"], DATE_FORMAT))
-        updated_records.append(data)
+            data = {k: (v * base_currency_eur_multiplier) if isinstance(v, (float, int)) else v
+                    for k, v in rates.items()}
+            data["date"] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.strptime(data["date"], DATE_FORMAT))
+            updated_records.append(data)
 
-        if not latest_available_date or latest_available_date < data["date"]:
-            latest_available_date = data["date"]
+            if not latest_available_date or latest_available_date < data["date"]:
+                latest_available_date = data["date"]
 
     return df.columns, updated_records, latest_available_date
 
@@ -115,13 +110,18 @@ def do_sync(config, start_date):
                     str(historical_end_date),
                     base)
         headers, records, latest_available_quote_date = get_historical_records(start_date, str(historical_end_date), base)
-        for h in headers:
-            if h != "date":
-                schema['properties'][h] = {'type': ['null', 'number']}
-        singer.write_schema('exchange_rate', schema, 'date')
-        singer.write_records('exchange_rate', records)
 
-        start_date = str((datetime.strptime(latest_available_quote_date[:10], DATE_FORMAT) + timedelta(days=1)).date())
+        if records:
+            for h in headers:
+                if h != "date":
+                    schema['properties'][h] = {'type': ['null', 'number']}
+            singer.write_schema('exchange_rate', schema, 'date')
+            singer.write_records('exchange_rate', records)
+
+        if latest_available_quote_date:
+            start_date = str((datetime.strptime(latest_available_quote_date[:10], DATE_FORMAT) + timedelta(days=1)).date())
+        else:
+            start_date = str(historical_end_date)
 
     state = {'start_date': start_date}
     next_date = start_date
