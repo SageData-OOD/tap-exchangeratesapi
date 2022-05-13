@@ -5,7 +5,7 @@ import copy
 import json
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 import backoff
 import requests
@@ -78,10 +78,13 @@ def get_historical_records(start_date, end_date, base):
 
     records = df.to_dict("records")
     updated_records = []
-    if base not in df and base != "EUR":
+
+    if base not in df:
         LOGGER.info("Selected Base Currency(%s) column not found in historical data", base)
         LOGGER.info("Skipping historical data sync...")
         return []
+
+    latest_available_date = None
 
     for rates in records:
         base_currency_eur_multiplier = 1 / rates[base]
@@ -95,7 +98,10 @@ def get_historical_records(start_date, end_date, base):
         data["date"] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.strptime(data["date"], DATE_FORMAT))
         updated_records.append(data)
 
-    return df.columns, updated_records
+        if not latest_available_date or latest_available_date < data["date"]:
+            latest_available_date = data["date"]
+
+    return df.columns, updated_records, latest_available_date
 
 
 def do_sync(config, start_date):
@@ -103,18 +109,19 @@ def do_sync(config, start_date):
 
     # get quotes from ECB for all dates older than historical_end_date
     historical_end_date = (datetime.utcnow() - timedelta(days=config.get("days_back", 0))).date()
-    if datetime.strptime(start_date, "%Y-%m-%d") < historical_end_date:
+    if date.fromisoformat(start_date) < historical_end_date:
         logger.info('Replicating Historical exchange rate from date %s to %s using base %s',
                     start_date,
                     str(historical_end_date),
                     base)
-        headers, records = get_historical_records(start_date, str(historical_end_date), base)
+        headers, records, latest_available_quote_date = get_historical_records(start_date, str(historical_end_date), base)
         for h in headers:
             if h != "date":
                 schema['properties'][h] = {'type': ['null', 'number']}
         singer.write_schema('exchange_rate', schema, 'date')
         singer.write_records('exchange_rate', records)
-        start_date = str(historical_end_date + timedelta(days=1))
+
+        start_date = str((datetime.strptime(latest_available_quote_date[:10], DATE_FORMAT) + timedelta(days=1)).date())
 
     state = {'start_date': start_date}
     next_date = start_date
