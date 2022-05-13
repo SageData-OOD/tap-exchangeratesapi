@@ -76,6 +76,12 @@ def get_historical_records(start_date, end_date, base):
 
     df["EUR"] = 1.0
 
+    # fix gaps during weekends when no quotes are available in the dataset
+    df['date'] = pd.to_datetime(df['date'])
+    df.set_index("date", inplace=True)
+    df = df.resample('D').bfill().reset_index()
+    df['date'] = df['date'].astype(str)
+
     records = df.to_dict("records")
     updated_records = []
     latest_available_date = None
