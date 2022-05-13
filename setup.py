@@ -9,9 +9,9 @@ setup(name='tap-exchangeratesapi',
       url='http://github.com/singer-io/tap-exchangeratesapi',
       classifiers=['Programming Language :: Python :: 3 :: Only'],
       py_modules=['tap_exchangeratesapi'],
-      install_requires=['singer-python==5.3.3',
-                        'backoff==1.3.2',
-                        'requests==2.21.0',
+      install_requires=['singer-python==5.12.2',
+                        'backoff==1.8.0',
+                        'requests==2.27.1',
                         'pandas==1.3.5'],
       extras_require={
           'dev': [
