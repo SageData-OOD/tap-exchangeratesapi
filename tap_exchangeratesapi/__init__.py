@@ -79,7 +79,7 @@ def get_historical_records(start_date, end_date, base):
     # fix gaps during weekends when no quotes are available in the dataset
     utc_today = str(datetime.utcnow().date())
     
-    if (df['date'] == utc_today).any():
+    if not (df['date'] == utc_today).any():
         df = pd.concat([df.iloc[0], df])
         df.at[0, 'date'] = utc_today
 
