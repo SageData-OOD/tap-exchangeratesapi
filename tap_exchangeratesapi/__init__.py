@@ -82,7 +82,7 @@ def get_historical_records(start_date, end_date, base):
     
     if dfToday.empty:
         df = pd.concat([df.head(1), df])
-        df.head(1)['date'] = utc_today
+        df.iloc[0]['date'] = utc_today
 
     df['date'] = pd.to_datetime(df['date'])
     df.set_index("date", inplace=True)
