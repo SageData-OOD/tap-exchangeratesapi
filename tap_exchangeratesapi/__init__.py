@@ -17,7 +17,6 @@ LOGGER = singer.get_logger()
 base_url = 'http://api.exchangeratesapi.io/v1/'
 history_url = 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip'
 
-logger = singer.get_logger()
 session = requests.Session()
 
 DATE_FORMAT = '%Y-%m-%d'
@@ -43,7 +42,7 @@ schema = {'type': 'object',
 
 
 def giveup(error):
-    logger.error(error.response.text)
+    LOGGER.error(error.response.text)
     response = error.response
     return not (response.status_code == 429 or
                 response.status_code >= 500)
@@ -78,12 +77,13 @@ def get_historical_records(start_date, end_date, base):
 
     # fix gaps during weekends when no quotes are available in the dataset
     utc_today = str(datetime.utcnow().date())
-    
+
     if not (df['date'] == utc_today).any():
-        df = pd.concat([df.iloc[0], df])
+        df = pd.concat([df.head(1), df])
         df.at[0, 'date'] = utc_today
 
     df['date'] = pd.to_datetime(df['date'])
+    df = df.drop_duplicates(subset="date")
     df.set_index("date", inplace=True)
     df = df.resample('D').ffill().reset_index()
     df['date'] = df['date'].astype(str)
@@ -117,7 +117,7 @@ def do_sync(config, start_date):
     # get quotes from ECB for all dates older than historical_end_date
     historical_end_date = (datetime.utcnow() - timedelta(days=config.get("days_back", 0))).date()
     if date.fromisoformat(start_date) < historical_end_date:
-        logger.info('Replicating Historical exchange rate from date %s to %s using base %s',
+        LOGGER.info('Replicating Historical exchange rate from date %s to %s using base %s',
                     start_date,
                     str(historical_end_date),
                     base)
@@ -140,7 +140,7 @@ def do_sync(config, start_date):
     prev_schema = {}
     try:
         while datetime.strptime(next_date, DATE_FORMAT) <= datetime.utcnow():
-            logger.info('Replicating exchange rate data from %s using base %s',
+            LOGGER.info('Replicating exchange rate data from %s using base %s',
                         next_date,
                         base)
 
@@ -164,14 +164,14 @@ def do_sync(config, start_date):
             prev_schema = copy.deepcopy(schema)
 
     except requests.exceptions.RequestException as e:
-        logger.fatal('Error on ' + e.request.url +
+        LOGGER.fatal('Error on ' + e.request.url +
                      '; received status ' + str(e.response.status_code) +
                      ': ' + e.response.text)
         singer.write_state(state)
         sys.exit(-1)
 
     singer.write_state(state)
-    logger.info('Tap exiting normally')
+    LOGGER.info('Tap exiting normally')
 
 
 def main():
