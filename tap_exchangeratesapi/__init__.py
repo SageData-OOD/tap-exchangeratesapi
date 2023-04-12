@@ -64,10 +64,6 @@ def get_historical_records(start_date, end_date, base):
     # Download records
     df = pd.read_csv(history_url, compression='zip')
 
-    # Extract records for the time period between start date and end date.
-    df = df[df['Date'] >= start_date]
-    df = df[df['Date'] <= end_date]
-
     # Refactor -> remove nan, drop extraneous column, Rename Date to date
     df = df.replace({np.nan: None})
     df = df.drop('Unnamed: 42', axis=1, errors='ignore')
@@ -87,6 +83,10 @@ def get_historical_records(start_date, end_date, base):
     df.set_index("date", inplace=True)
     df = df.resample('D').ffill().reset_index()
     df['date'] = df['date'].astype(str)
+
+    # Extract records for the time period between start date and end date.
+    df = df[df['date'] >= start_date]
+    df = df[df['date'] <= end_date]
 
     records = df.to_dict("records")
     updated_records = []
